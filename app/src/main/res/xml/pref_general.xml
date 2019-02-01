@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <CheckBoxPreference
+        android:defaultValue="@string/default_enable_notifications"
+        android:key="@string/key_enable_notifications"
+        android:summaryOff="@string/summary_false_enable_notifications"
+        android:summaryOn="@string/summary_true_enable_notifications"
+        android:title="@string/title_enable_notifications"/>
+
+    <ListPreference
+        android:title="@string/title_select_sync_frequency"
+        android:summary="@string/summary_select_sync_frequency"
+        android:dialogIcon="@mipmap/ic_movie"
+        android:dialogTitle="Favourite Games"
+        android:key="@string/key_sync_frequency"
+        android:entries="@array/select_frequency"
+        android:entryValues="@array/frequency_index"/>
+</PreferenceScreen>

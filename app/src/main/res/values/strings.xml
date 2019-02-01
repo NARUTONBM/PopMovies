@@ -1,0 +1,91 @@
+<resources xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
+    <string name="app_name">热门电影</string>
+    <string name="iv_movie_des">movie_backdrop</string>
+    <string name="movies_date">2016</string>
+    <string name="empty_recycler_view">什么也没有诶～</string>
+    <string name="tv_overview_title">简介</string>
+    <string name="movie_detail_title">影片详细</string>
+    <string name="genres_head">类型：</string>
+    <string name="action_refresh">刷新</string>
+    <string name="action_order_by_popularity">按热度排列</string>
+    <string name="action_order_by_top_rate">按评分排列</string>
+    <string name="no_runtime">暂无时长信息</string>
+    <string name="genre_exception">解析genre异常</string>
+    <string name="denied_permission">您拒绝了权限申请，将导致应用无法正常使用</string>
+    <string name="no_reviews">暂无评论</string>
+    <string name="json_exception">解析json异常</string>
+    <string name="no_videos">暂无预告片</string>
+    <string name="btExpand">展开</string>
+    <string name="btShrink">收缩</string>
+    <string name="tv_videos_title">预告片</string>
+    <string name="tv_reviews_title">评论</string>
+    <string name="fail_to_load_background">预告片背景图加载失败</string>
+    <string name="player_error">Error initializing YouTube player</string>
+    <string name="action_collect">收藏</string>
+    <string name="action_order_by_favorite">收藏电影</string>
+    <string name="test_tv_title">爱宠大机密</string>
+    <string name="test_tv_movie_genre">冒险, 动画, 喜剧, 家庭</string>
+    <string name="test_tv_movie_date">2016</string>
+    <string name="iv_favorite_desc">Favorite or not</string>
+    <string name="iv_line_overview">overview_line</string>
+    <string name="iv_line_videos">videos_line</string>
+    <string name="iv_video">videos</string>
+    <string name="iv_line_reviews">reviews_line</string>
+    <string name="action_setting">设置</string>
+    <string name="key_poster">movie_poster</string>
+    <string name="key_title">movie_title</string>
+    <string name="key_original_title">movie_original_title</string>
+    <string name="key_original_language">movie_original_language</string>
+    <string name="add_favorite_successfully">添加收藏成功</string>
+    <string name="remove_favorite_successfully">取消收藏成功</string>
+    <string name="no_overview">暂无简介</string>
+    <string name="sync_account_type">popmovies.naruto.com</string>
+    <string name="content_authority">com.naruto.popmovies.data</string>
+    <!-- Notification Format -->
+    <string name="format_notification">影片: <xliff:g id="movieTitle">%1$s</xliff:g> 评分: <xliff:g id="voteAverage">%2$s</xliff:g></string>
+    <!-- Strings related to Notification preference -->
+    <string name="pref_last_notification">last_notification</string>
+    <string name="key_enable_notifications">enable_notifications</string>
+    <string name="default_enable_notifications">true</string>
+    <string name="summary_false_enable_notifications">关闭</string>
+    <string name="summary_true_enable_notifications">打开</string>
+    <string name="title_enable_notifications">是否打开最高排名电影通知</string>
+    <string name="title_activity_settings">设置</string>
+    <string name="toast_already_up_to_date">已经是最新的排行啦～</string>
+    <string name="iv_line_after_reviews">line_after_reviews</string>
+    <string name="key_sync_frequency">sync_frequency</string>
+    <string name="title_select_sync_frequency">请选择数据同步的频率</string>
+    <string name="summary_select_sync_frequency">24小时</string>
+    <string name="toast_sync_frequency_already_updated">更新频率已更新咯～</string>
+    <string name="toast_already_scroll_to_the_bottom">滑动到底啦～</string>
+    <string name="text_error_view">加载内容失败，请检查您的网络是否正常哦～</string>
+    <string name="toast_unstable_connection">你的网络状况不太稳定哦～</string>
+    <string name="no_genre">暂无类型信息诶～</string>
+    <string name="tv_loading">正在拼命加载中···</string>
+    <string name="empty_recycler_view_no_connection">您似乎进入了没有网络的二次元欸～</string>
+    <string name="empty_recycler_view_server_down">无可用信息，服务器似乎被偷到二次元去了～</string>
+    <string name="empty_recycler_view_server_invalid">无可用信息，服务器的数据似乎被二次元怪物吃掉了呢～</string>
+    <string name="empty_forecast_list">No Movies Information Available</string>
+    <string name="muzei_desc">Top Movie</string>
+    <string name="value_name_youtube_id">v=</string>
+    <string-array name="select_frequency">
+        <item>1小时</item>
+        <item>2小时</item>
+        <item>3小时</item>
+        <item>6小时</item>
+        <item>9小时</item>
+        <item>12小时</item>
+        <item>18小时</item>
+        <item>24小时</item>
+    </string-array>
+    <string-array name="frequency_index">
+        <item>0</item>
+        <item>1</item>
+        <item>2</item>
+        <item>3</item>
+        <item>4</item>
+        <item>5</item>
+        <item>6</item>
+        <item>7</item>
+    </string-array>
+</resources>

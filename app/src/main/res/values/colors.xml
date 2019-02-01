@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="colorPrimary">@android:color/holo_blue_light</color>
+    <color name="colorPrimaryDark">@android:color/holo_blue_dark</color>
+    <color name="colorAccent">@android:color/holo_red_light</color>
+    <color name="color_read">#D9D9D9</color>
+    <color name="colorPrimaryLight">#B3E5FC</color> <!-- 100 -->
+    <color name="black_translucent_60">#99000000</color>
+</resources>

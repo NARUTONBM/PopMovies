@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<litepal>
+    <dbname value="movies_info"/>
+
+    <version value="2"/>
+
+    <list>
+        <mapping class="com.naruto.popmovies.db.model.Movie"/>
+        <mapping class="com.naruto.popmovies.db.model.Genre"/>
+        <mapping class="com.naruto.popmovies.db.model.Links"/>
+        <mapping class="com.naruto.popmovies.db.model.Review"/>
+    </list>
+</litepal>

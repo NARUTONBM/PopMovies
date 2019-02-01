@@ -1,0 +1,24 @@
+<resources>
+
+    <!-- Base application theme. -->
+    <style name="CustomHoloBlue" parent="Theme.Design.Light.NoActionBar">
+        <item name="colorPrimaryDark">@android:color/holo_blue_dark</item>
+        <item name="colorAccent">@android:color/holo_red_light</item>
+        <item name="colorPrimary">@android:color/holo_blue_light</item>
+    </style>
+
+    <style name="AppBaseToolbarOverflowMenuStyle" parent="@style/Widget.AppCompat.Light.PopupMenu.Overflow">
+        <item name="overlapAnchor">false</item>
+        <item name="android:popupBackground">@color/material_deep_teal_500</item>
+        <!--ActionBar Menu颜色-->
+        <item name="android:textColorPrimary">@android:color/white</item>
+    </style>
+    <!-- Settings activity theme. -->
+    <style name="SettingsTheme" parent="CustomHoloBlue">
+    </style>
+
+    <style name="DetailTextVIew">
+        <item name="android:maxLines">1</item>
+        <item name="android:textAppearance">@style/Base.TextAppearance.AppCompat.Subhead</item>
+    </style>
+</resources>
