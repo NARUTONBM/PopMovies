@@ -245,17 +245,17 @@ public class SyncAdapter extends AbstractThreadedSyncAdapter {
                         }
                     } else {
 
-                        SpUtils.putInt(getContext(), Entry.MOVIES_STATUS, MOVIES_STATUS_SERVER_DOWN);
+                        SpUtils.putInt(getContext(), Entry.SP_MOVIES_STATUS, MOVIES_STATUS_SERVER_DOWN);
                     }
                     jsonResponse = output.toString();
                 } else {
 
                     Log.e(LOG_TAG, "错误响应码：" + urlConnection.getResponseCode());
-                    SpUtils.putInt(getContext(), Entry.MOVIES_STATUS, MOVIES_STATUS_SERVER_INVALID);
+                    SpUtils.putInt(getContext(), Entry.SP_MOVIES_STATUS, MOVIES_STATUS_SERVER_INVALID);
                 }
             } catch (Exception e) {
 
-                SpUtils.putInt(getContext(), Entry.MOVIES_STATUS, MOVIES_STATUS_SERVER_DOWN);
+                SpUtils.putInt(getContext(), Entry.SP_MOVIES_STATUS, MOVIES_STATUS_SERVER_DOWN);
                 toastConnectionProblem(e);
             } finally {
 
@@ -360,7 +360,7 @@ public class SyncAdapter extends AbstractThreadedSyncAdapter {
 
                 // 准备将要去做插入或更新的URI
                 updateOrInsertToDb(i, values, orderMode);
-                SpUtils.putInt(getContext(), Entry.MOVIES_STATUS, MOVIES_STATUS_OK);
+                SpUtils.putInt(getContext(), Entry.SP_MOVIES_STATUS, MOVIES_STATUS_OK);
                 notifyMovies(orderMode);
             }
         } catch (Exception e) {

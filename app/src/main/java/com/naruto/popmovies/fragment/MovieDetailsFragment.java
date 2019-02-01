@@ -160,7 +160,7 @@ public class MovieDetailsFragment extends Fragment implements View.OnClickListen
         mLlReviewsContainer = rootView.findViewById(R.id.ll_reviews_container);
         mInflater = LayoutInflater.from(getContext());
 
-        mOrderMode = SpUtils.getInt(getContext(), Entry.ORDER_MODE, Entry.POPULAR_MOVIE_DIR);
+        mOrderMode = SpUtils.getInt(getContext(), Entry.SP_ORDER_MODE, Entry.POPULAR_MOVIE_DIR);
 
         startCursorLoaderLoadData();
 

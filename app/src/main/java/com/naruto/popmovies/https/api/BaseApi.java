@@ -29,24 +29,15 @@ public interface BaseApi {
     Observable<ConfigurationBean> getConfiguration(@Query("api_key") String apiKey);
 
     /**
-     * 请求热门电影列表
+     * 请求电影列表
      *
+     * @param listType 列表的类型：popular/top_rate
      * @param apiKey api_key
      * @param page   页码
      * @return 返回电影列表
      */
-    @GET("movie/popular?language=zh")
-    Observable<MovieListBean> getPopMovieList(@Query("api_key") String apiKey, @Query("page") int page);
-
-    /**
-     * 请求高分电影列表
-     *
-     * @param apiKey api_key
-     * @param page   页码
-     * @return 返回电影列表
-     */
-    @GET("movie/top_rated?language=zh")
-    Observable<MovieListBean> getTopRateMovieList(@Query("api_key") String apiKey, @Query("page") int page);
+    @GET("movie/{list_type}?language=zh")
+    Observable<MovieListBean> getMovieList(@Path("list_type") String listType, @Query("api_key") String apiKey, @Query("page") int page);
 
     /**
      * 请求电影视频和评论列表

@@ -42,7 +42,7 @@ public class MovieMuzeiSource extends MuzeiArtSource {
 	@Override
 	protected void onUpdate(int reason) {
 
-        int orderMode = SpUtils.getInt(MovieMuzeiSource.this, Entry.ORDER_MODE, Entry.POPULAR_MOVIE_DIR);
+        int orderMode = SpUtils.getInt(MovieMuzeiSource.this, Entry.SP_ORDER_MODE, Entry.POPULAR_MOVIE_DIR);
 		Cursor cursor = getContentResolver().query(Utils.fetchCurrentUri(orderMode), null, null, null,
                 Entry.COLUMN_MOVIE_ID + " ASC");
 		if (cursor != null && cursor.moveToFirst()) {

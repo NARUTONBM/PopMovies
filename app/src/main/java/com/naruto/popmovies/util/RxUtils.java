@@ -1,6 +1,7 @@
 package com.naruto.popmovies.util;
 
-import io.reactivex.Observable;
+import com.naruto.popmovies.fragment.BaseFragment;
+
 import io.reactivex.ObservableTransformer;
 import io.reactivex.android.schedulers.AndroidSchedulers;
 import io.reactivex.annotations.NonNull;
@@ -21,28 +22,42 @@ public class RxUtils {
 
     public static <T> ObservableTransformer<T, T> applySchedulers() {
         //final BaseActivity baseActivity = (BaseActivity) view;
-        return new ObservableTransformer<T, T>() {
-            @Override
-            public Observable<T> apply(Observable<T> observable) {
-                return observable.subscribeOn(Schedulers.io())
-                        .doOnSubscribe(new Consumer<Disposable>() {
-                            @Override
-                            public void accept(@NonNull Disposable disposable) {
-                                //显示进度条
-                                //baseActivity.showLoadingDialog();
-                            }
-                        })
-                        .subscribeOn(AndroidSchedulers.mainThread())
-                        .observeOn(AndroidSchedulers.mainThread())
-                        .doFinally(new Action() {
-                            @Override
-                            public void run() {
-                                //隐藏进度条
-                                //baseActivity.closeLoadingDialog();
-                            }
-                        });
-            }
-        };
+        return observable -> observable.subscribeOn(Schedulers.io())
+                .doOnSubscribe(new Consumer<Disposable>() {
+                    @Override
+                    public void accept(@NonNull Disposable disposable) {
+                        //显示进度条
+                        //baseActivity.showLoadingDialog();
+                    }
+                })
+                .subscribeOn(AndroidSchedulers.mainThread())
+                .observeOn(AndroidSchedulers.mainThread())
+                .doFinally(new Action() {
+                    @Override
+                    public void run() {
+                        //隐藏进度条
+                        //baseActivity.closeLoadingDialog();
+                    }
+                });
     }
 
+    public static <T> ObservableTransformer<T, T> applySchedulers(BaseFragment fragment) {
+        return observable -> observable.subscribeOn(Schedulers.io())
+                .doOnSubscribe(new Consumer<Disposable>() {
+                    @Override
+                    public void accept(@NonNull Disposable disposable) {
+                        //显示进度条
+                        fragment.showDialog();
+                    }
+                })
+                .subscribeOn(AndroidSchedulers.mainThread())
+                .observeOn(AndroidSchedulers.mainThread())
+                .doFinally(new Action() {
+                    @Override
+                    public void run() {
+                        //隐藏进度条
+                        fragment.dismissDialog();
+                    }
+                });
+    }
 }

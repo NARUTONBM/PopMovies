@@ -5,7 +5,7 @@ import android.database.Cursor;
 
 import com.naruto.popmovies.data.Entry;
 
-import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Created with Android Studio.
@@ -71,7 +71,7 @@ public class MovieDetail {
         mVideosData = videosData;
     }
 
-    public static ArrayList<MovieDetail> fromCursor(ArrayList<MovieDetail> movieDetails, Cursor cursor) {
+    public static List<MovieDetail> fromCursor(List<MovieDetail> movieDetails, Cursor cursor) {
         MovieDetail details = null;
         if (cursor != null && cursor.moveToFirst()) {
 

@@ -12,103 +12,141 @@ import android.support.v7.widget.Toolbar;
 import android.view.Menu;
 import android.view.MenuItem;
 
+import com.blankj.utilcode.util.AppUtils;
+import com.blankj.utilcode.util.SPUtils;
+import com.naruto.popmovies.BuildConfig;
 import com.naruto.popmovies.R;
+import com.naruto.popmovies.bean.GenreListBean;
 import com.naruto.popmovies.data.Entry;
+import com.naruto.popmovies.db.model.Genre;
 import com.naruto.popmovies.fragment.MovieDetailsFragment;
 import com.naruto.popmovies.fragment.MoviesFragment;
+import com.naruto.popmovies.https.BaseHandleSubscriber;
+import com.naruto.popmovies.https.RetrofitHelper;
 import com.naruto.popmovies.sync.SyncAdapter;
-import com.naruto.popmovies.util.SpUtils;
+import com.naruto.popmovies.util.RxUtils;
+
+import org.litepal.LitePal;
 
 public class MainActivity extends AppCompatActivity implements MoviesFragment.CallBack {
 
     private static final String DETAILS_FRAGMENT_TAG = "DFTAG";
-	private boolean mTwoPane = false;
-	private int mOrderMode;
+    private boolean mTwoPane = false;
+    private int mOrderMode;
+    private SPUtils mSpUtils;
 
-	@Override
-	protected void onCreate(Bundle savedInstanceState) {
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
 
-		super.onCreate(savedInstanceState);
-		setContentView(R.layout.activity_main);
-		Toolbar toolbar = findViewById(R.id.toolbar_movies);
-		setSupportActionBar(toolbar);
-        mOrderMode = SpUtils.getInt(this, Entry.ORDER_MODE, Entry.POPULAR_MOVIE_DIR);
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_main);
+        Toolbar toolbar = findViewById(R.id.toolbar_movies);
+        setSupportActionBar(toolbar);
+        mSpUtils = SPUtils.getInstance(AppUtils.getAppName());
+        mOrderMode = mSpUtils.getInt(Entry.SP_ORDER_MODE, Entry.POPULAR_MOVIE_DIR);
+        //初始化影片类型表genre.db
+        initGenreDB();
 
-		if (findViewById(R.id.movie_details_container) != null) {
+        if (findViewById(R.id.movie_details_container) != null) {
 
-			mTwoPane = true;
-			if (savedInstanceState == null) {
+            mTwoPane = true;
+            if (savedInstanceState == null) {
 
-				getSupportFragmentManager().beginTransaction()
+                getSupportFragmentManager().beginTransaction()
                         .replace(R.id.movie_details_container, new MovieDetailsFragment(), DETAILS_FRAGMENT_TAG)
-								.commit();
-			}
-		} else {
+                        .commit();
+            }
+        } else {
 
-			mTwoPane = false;
-		}
+            mTwoPane = false;
+        }
 
-		SyncAdapter.initializeSyncAdapter(this);
-	}
+        SyncAdapter.initializeSyncAdapter(this);
+    }
 
-	@Override
-	public boolean onCreateOptionsMenu(Menu menu) {
+    /**
+     * 初始化数据库的方法，首先写入或更新genre.db
+     */
+    private void initGenreDB() {
+        if (!mSpUtils.getBoolean(Entry.SP_DB_INIT, false)) {
+            LitePal.getDatabase();
+        }
+        RetrofitHelper.getBaseApi()
+                .getGenreList(BuildConfig.MOVIE_DB_KEY)
+                .compose(RxUtils.applySchedulers())
+                .subscribe(new BaseHandleSubscriber<GenreListBean>() {
+                    @Override
+                    public void onNext(GenreListBean genreList) {
+                        boolean finalResult = true;
+                        for (Genre genre : genreList.getGenres()) {
+                            Genre dbGenre = new Genre();
+                            dbGenre.setGenreId(genre.getId());
+                            dbGenre.setName(genre.getName());
+                            boolean suResult = dbGenre.saveOrUpdate("genre_id = ?", String.valueOf(genre.getId()));
+                            finalResult = finalResult & suResult;
+                        }
+                        mSpUtils.put(Entry.SP_DB_INIT, finalResult);
+                    }
+                });
+    }
 
-		// 添加选项条目
-		getMenuInflater().inflate(R.menu.menu_main, menu);
+    @Override
+    public boolean onCreateOptionsMenu(Menu menu) {
 
-		return true;
-	}
+        // 添加选项条目
+        getMenuInflater().inflate(R.menu.menu_main, menu);
 
-	@Override
-	public boolean onOptionsItemSelected(MenuItem item) {
+        return true;
+    }
 
-		int id = item.getItemId();
-		// noinspection SimplifiableIfStatement
-		if (id == R.id.action_setting) {
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item) {
 
-			startActivity(new Intent(this, SettingActivity.class));
-			return true;
-		}
+        int id = item.getItemId();
+        // noinspection SimplifiableIfStatement
+        if (id == R.id.action_setting) {
 
-		return super.onOptionsItemSelected(item);
-	}
+            startActivity(new Intent(this, SettingActivity.class));
+            return true;
+        }
 
-	@Override
-	protected void onResume() {
+        return super.onOptionsItemSelected(item);
+    }
 
-		super.onResume();
-		// 当排序模式发生变化时，调用方法刷新数据
-        int orderMode = SpUtils.getInt(this, Entry.ORDER_MODE, Entry.POPULAR_MOVIE_DIR);
-		if (orderMode != mOrderMode) {
+    @Override
+    protected void onResume() {
 
-			MoviesFragment moviesFragment = (MoviesFragment) getSupportFragmentManager()
-							.findFragmentById(R.id.fragment_movies);
-			if (moviesFragment != null) {
+        super.onResume();
+        // 当排序模式发生变化时，调用方法刷新数据
+        int orderMode = mSpUtils.getInt(Entry.SP_ORDER_MODE, Entry.POPULAR_MOVIE_DIR);
+        if (orderMode != mOrderMode) {
 
-				moviesFragment.onOrderModeChanged();
-			}
-			mOrderMode = orderMode;
-		}
-	}
+            MoviesFragment moviesFragment = (MoviesFragment) getSupportFragmentManager().findFragmentById(R.id.fragment_movies);
+            if (moviesFragment != null) {
 
-	@Override
-	public void onItemSelected(Uri uri) {
+                moviesFragment.onOrderModeChanged();
+            }
+            mOrderMode = orderMode;
+        }
+    }
 
-		if (mTwoPane) {
+    @Override
+    public void onItemSelected(Uri uri) {
 
-			// 对于two-pane模式，通过MovieDetailsFragment展示详细信息
-			Bundle bundle = new Bundle();
-			bundle.putParcelable(MovieDetailsFragment.DETAIL_URI, uri);
+        if (mTwoPane) {
 
-			MovieDetailsFragment fragment = new MovieDetailsFragment();
-			fragment.setArguments(bundle);
+            // 对于two-pane模式，通过MovieDetailsFragment展示详细信息
+            Bundle bundle = new Bundle();
+            bundle.putParcelable(MovieDetailsFragment.DETAIL_URI, uri);
+
+            MovieDetailsFragment fragment = new MovieDetailsFragment();
+            fragment.setArguments(bundle);
 
             getSupportFragmentManager().beginTransaction().replace(R.id.movie_details_container, fragment, DETAILS_FRAGMENT_TAG).commit();
-		} else {
+        } else {
 
-			Intent intent = new Intent(this, MovieDetailsActivity.class).setData(uri);
-			startActivity(intent);
-		}
-	}
+            Intent intent = new Intent(this, MovieDetailsActivity.class).setData(uri);
+            startActivity(intent);
+        }
+    }
 }

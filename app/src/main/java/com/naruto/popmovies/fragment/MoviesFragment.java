@@ -32,22 +32,28 @@ import android.view.ViewGroup;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.blankj.utilcode.util.ToastUtils;
 import com.jude.easyrecyclerview.decoration.SpaceDecoration;
+import com.naruto.popmovies.BuildConfig;
 import com.naruto.popmovies.R;
 import com.naruto.popmovies.adapter.MovieAdapter;
 import com.naruto.popmovies.bean.MovieDetail;
+import com.naruto.popmovies.bean.MovieListBean;
+import com.naruto.popmovies.bean.VIRListBean;
 import com.naruto.popmovies.data.Entry;
 import com.naruto.popmovies.data.MovieDetailsContract;
+import com.naruto.popmovies.https.BaseHandleSubscriber;
+import com.naruto.popmovies.https.RetrofitHelper;
 import com.naruto.popmovies.sync.SyncAdapter;
+import com.naruto.popmovies.util.MovieDbUtils;
+import com.naruto.popmovies.util.RxUtils;
 import com.naruto.popmovies.util.SpUtils;
 import com.naruto.popmovies.util.Utils;
 
-import org.litepal.LitePal;
-
 import java.util.ArrayList;
+import java.util.List;
 
 import static android.support.v7.widget.RecyclerView.SCROLL_STATE_IDLE;
-import static com.naruto.popmovies.sync.SyncAdapter.MOVIES_STATUS_OK;
 
 /**
  * Created by Android Studio. User: jellybean. Date: 2017/10/18. Time: 上午1:16.
@@ -60,9 +66,10 @@ public class MoviesFragment extends BaseFragment implements LoaderManager.Loader
     public static int mOrderMode = Entry.POPULAR_MOVIE_DIR;
 
     private TextView mTvEmptyView;
-    private MovieAdapter mAdapter;
+    private MovieAdapter mMovieAdapter;
     private static int mPosition = RecyclerView.INVALID_TYPE;
-    private ArrayList<MovieDetail> mMovieDetails = new ArrayList<>();
+    private List<MovieDetail> mMovieDetails = new ArrayList<>();
+    private List<MovieListBean.ResultsBean> mMovieList = new ArrayList<>();
     private static final int MOVIE_LIST_MAX = 20;
     private ContentResolver mResolver;
     private SharedPreferences mPreferences;
@@ -75,40 +82,6 @@ public class MoviesFragment extends BaseFragment implements LoaderManager.Loader
 
         super.onCreate(savedInstanceState);
         setHasOptionsMenu(true);
-        LitePal.getDatabase();
-        //数据库联动测试代码
-        /*RetrofitHelper.getBaseApi()
-                .getGenreList(BuildConfig.MOVIE_DB_KEY)
-                .compose(RxUtils.applySchedulers())
-                .subscribe(new BaseHandleSubscriber<GenreListBean>() {
-                    @Override
-                    public void onNext(GenreListBean genreList) {
-                        for (Genre genre : genreList.getGenres()) {
-                            Genre dbGenre = new Genre();
-                            dbGenre.setGenreId(genre.getId());
-                            dbGenre.setName(genre.getName());
-                            dbGenre.saveOrUpdate("genre_id = ?", String.valueOf(genre.getId()));
-                        }
-                        RetrofitHelper.getBaseApi()
-                                .getPopMovieList(BuildConfig.MOVIE_DB_KEY, 1)
-                                .compose(RxUtils.applySchedulers())
-                                .subscribe(new BaseHandleSubscriber<MovieListBean>() {
-                                    @Override
-                                    public void onNext(MovieListBean movieListBean) {
-                                        MovieListBean.ResultsBean movieBean = movieListBean.getResults().get(0);
-                                        RetrofitHelper.getBaseApi()
-                                                .getVideoAndReviewList(movieBean.getId(), BuildConfig.MOVIE_DB_KEY)
-                                                .compose(RxUtils.applySchedulers())
-                                                .subscribe(new BaseHandleSubscriber<VIRListBean>() {
-                                                    @Override
-                                                    public void onNext(VIRListBean virListBean) {
-                                                        MovieDbUtils.addMovie(movieBean, virListBean);
-                                                    }
-                                                });
-                                    }
-                                });
-                    }
-                });*/
     }
 
     @TargetApi(Build.VERSION_CODES.M)
@@ -123,15 +96,15 @@ public class MoviesFragment extends BaseFragment implements LoaderManager.Loader
         // 找到recyclerView
         RecyclerView rvMovie = rootView.findViewById(R.id.rv_movie);
         // 创建适配器
-        mAdapter = new MovieAdapter(mMovieDetails);
-        mAdapter.setHasStableIds(true);
+        mMovieAdapter = new MovieAdapter(mMovieList);
+        mMovieAdapter.setHasStableIds(true);
 
         // 设置布局管理者
         final StaggeredGridLayoutManager gridLayoutManager = new StaggeredGridLayoutManager(1, StaggeredGridLayoutManager.VERTICAL);
         gridLayoutManager.setGapStrategy(StaggeredGridLayoutManager.GAP_HANDLING_NONE);
         rvMovie.setLayoutManager(gridLayoutManager);
         // 设置适配器
-        rvMovie.setAdapter(mAdapter);
+        rvMovie.setAdapter(mMovieAdapter);
         // 设置边距
         SpaceDecoration itemDecoration = new SpaceDecoration((int) Utils.convertDpToPixel(8, getContext()));
         itemDecoration.setPaddingEdgeSide(true);
@@ -194,10 +167,16 @@ public class MoviesFragment extends BaseFragment implements LoaderManager.Loader
         });
 
         // 获取当前的排序模式
-        mOrderMode = SpUtils.getInt(getContext(), Entry.ORDER_MODE, Entry.POPULAR_MOVIE_DIR);
+        mOrderMode = mSPUtils.getInt(Entry.SP_ORDER_MODE, Entry.POPULAR_MOVIE_DIR);
+        //加载数据
+        if (mOrderMode == Entry.POPULAR_MOVIE_DIR) {
+            getMovieList(Entry.REQUEST_POPULAR, Entry.ACTION_REFRESH, 1);
+        } else if (mOrderMode == Entry.TOP_RATE_MOVIE_DIR) {
+            getMovieList(Entry.REQUEST_TOP_RATE, Entry.ACTION_REFRESH, 1);
+        }
 
         // 设置recyclerView的条目点击事件
-        mAdapter.setOnItemClickListener((view, position) -> {
+        mMovieAdapter.setOnItemClickListener((view, position) -> {
             // 根据排序模式传递不同的uri，提供给MovieDetailsFragment来获取数据
             ((CallBack) getActivity()).onItemSelected(MovieDetailsContract.MovieDetailsEntry.buildDetailsUri(Utils.fetchCurrentUri(mOrderMode),
                     position + 1));
@@ -230,7 +209,7 @@ public class MoviesFragment extends BaseFragment implements LoaderManager.Loader
         getLoaderManager().initLoader(fetchCurrentLoaderId(), null, this);
         if (mOrderMode != Entry.FAVORITE_MOVIE_DIR) {
 
-            showAlertDialog();
+            showDialog();
         }
         updateEmptyView();
         super.onActivityCreated(savedInstanceState);
@@ -320,8 +299,8 @@ public class MoviesFragment extends BaseFragment implements LoaderManager.Loader
     private void updateMovies() {
 
         mMovieDetails.clear();
-        mAdapter.notifyDataSetChanged();
-        showAlertDialog();
+        //mMovieAdapter.notifyDataSetChanged();
+        showDialog();
         if (mOrderMode != Entry.FAVORITE_MOVIE_DIR) {
 
             SyncAdapter.syncImmediately(getActivity());
@@ -358,21 +337,21 @@ public class MoviesFragment extends BaseFragment implements LoaderManager.Loader
         switch (item.getItemId()) {
 
             case R.id.action_order_by_popularity:
-                SpUtils.putInt(getContext(), Entry.ORDER_MODE, Entry.POPULAR_MOVIE_DIR);
+                SpUtils.putInt(getContext(), Entry.SP_ORDER_MODE, Entry.POPULAR_MOVIE_DIR);
                 mOrderMode = Entry.POPULAR_MOVIE_DIR;
                 onOrderModeChanged();
 
                 break;
 
             case R.id.action_order_by_top_rate:
-                SpUtils.putInt(getContext(), Entry.ORDER_MODE, Entry.TOP_RATE_MOVIE_DIR);
+                SpUtils.putInt(getContext(), Entry.SP_ORDER_MODE, Entry.TOP_RATE_MOVIE_DIR);
                 mOrderMode = Entry.TOP_RATE_MOVIE_DIR;
                 onOrderModeChanged();
 
                 break;
 
             case R.id.action_order_by_favorite:
-                SpUtils.putInt(getContext(), Entry.ORDER_MODE, Entry.FAVORITE_MOVIE_DIR);
+                SpUtils.putInt(getContext(), Entry.SP_ORDER_MODE, Entry.FAVORITE_MOVIE_DIR);
                 mOrderMode = Entry.FAVORITE_MOVIE_DIR;
                 onOrderModeChanged();
 
@@ -400,6 +379,62 @@ public class MoviesFragment extends BaseFragment implements LoaderManager.Loader
         }
     }
 
+    /**
+     * 获取电影列表
+     *
+     * @param listType   列表类型
+     * @param pullAction 滑动动作
+     * @param page       页码
+     */
+    private void getMovieList(String listType, int pullAction, int page) {
+        RetrofitHelper.getBaseApi()
+                .getMovieList(listType, BuildConfig.MOVIE_DB_KEY, page)
+                .compose(RxUtils.applySchedulers(this))
+                .subscribe(new BaseHandleSubscriber<MovieListBean>() {
+                    @Override
+                    public void onNext(MovieListBean movieListBean) {
+                        for (MovieListBean.ResultsBean movieBean : movieListBean.getResults()) {
+                            RetrofitHelper.getBaseApi()
+                                    .getVideoAndReviewList(movieBean.getId(), BuildConfig.MOVIE_DB_KEY)
+                                    .compose(RxUtils.applySchedulers())
+                                    .subscribe(new BaseHandleSubscriber<VIRListBean>() {
+                                        @Override
+                                        public void onNext(VIRListBean virListBean) {
+                                            MovieDbUtils.addMovie(movieBean, virListBean);
+                                        }
+                                    });
+                        }
+                        if (pullAction == Entry.ACTION_REFRESH) {
+                            mMovieList.clear();
+                        }
+                        mMovieList.addAll(movieListBean.getResults());
+                        mMovieAdapter.notifyDataSetChanged();
+                        /*if (pullAction == Entry.ACTION_REFRESH) {
+                            mSrlFriendsContainer.finishRefresh();
+                        } else if (pullAction == Entry.ACTION_LOAD_MORE) {
+                            mSrlFriendsContainer.finishLoadMore();
+                        }*/
+                    }
+                });
+    }
+
+    /**
+     * 加载下一页
+     *
+     * @param listType 列表类型
+     */
+    private void loadMoreMovies(String listType) {
+        int itemCount = mMovieAdapter.getItemCount();
+        if (itemCount % Entry.LOAD_PER != 0) {
+            //没有更多数据了
+            ToastUtils.showShort(R.string.value_toast_there_is_no_more);
+            //refreshLayout.finishLoadMore();
+        } else {
+            //可能还有更多数据
+            getMovieList(listType, Entry.ACTION_LOAD_MORE, itemCount / Entry.LOAD_PER + 1);
+        }
+    }
+
     @Override
     public Loader<Cursor> onCreateLoader(int id, Bundle args) {
 
@@ -416,13 +451,13 @@ public class MoviesFragment extends BaseFragment implements LoaderManager.Loader
     public void onLoaderReset(Loader<Cursor> loader) {
 
         mMovieDetails.clear();
-        mAdapter.swapCursor(null);
+        //mMovieAdapter.swapCursor(null);
     }
 
     @Override
     public void onSharedPreferenceChanged(SharedPreferences sharedPreferences, String key) {
 
-        if (key.equals(Entry.MOVIES_STATUS)) {
+        if (key.equals(Entry.SP_MOVIES_STATUS)) {
 
             updateEmptyView();
         }
@@ -461,10 +496,10 @@ public class MoviesFragment extends BaseFragment implements LoaderManager.Loader
         mMovieDetails.clear();
         if (cursor != null && cursor.moveToNext()) {
             mMovieDetails = MovieDetail.fromCursor(mMovieDetails, cursor);
-            mAdapter.notifyDataSetChanged();
+            //mMovieAdapter.notifyDataSetChanged();
             // 加载完成，隐藏进度条
             if (mMovieDetails.size() < MOVIE_LIST_MAX && mOrderMode != Entry.FAVORITE_MOVIE_DIR) {
-                showAlertDialog();
+                showDialog();
             } else {
                 dismissDialog();
             }
@@ -473,9 +508,9 @@ public class MoviesFragment extends BaseFragment implements LoaderManager.Loader
             // 提示用户没有获取到数据
             updateEmptyView();
             mMovieDetails.clear();
-            mAdapter.notifyDataSetChanged();
+            //mMovieAdapter.notifyDataSetChanged();
         }
-        mAdapter.swapCursor(cursor);
+        //mMovieAdapter.swapCursor(cursor);
 
         assert cursor != null;
         cursor.close();
@@ -486,13 +521,13 @@ public class MoviesFragment extends BaseFragment implements LoaderManager.Loader
      */
     private void updateEmptyView() {
 
-        if (mAdapter.getItemCount() == 0) {
+        /*if (mMovieAdapter.getItemCount() == 0) {
 
             if (mTvEmptyView != null) {
 
                 int message = R.string.empty_recycler_view;
                 @SyncAdapter.MoviesStatus
-                int status = SpUtils.getInt(getContext(), Entry.MOVIES_STATUS, MOVIES_STATUS_OK);
+                int status = SpUtils.getInt(getContext(), Entry.SP_MOVIES_STATUS, MOVIES_STATUS_OK);
                 switch (status) {
 
                     case SyncAdapter.MOVIES_STATUS_OK:
@@ -524,6 +559,6 @@ public class MoviesFragment extends BaseFragment implements LoaderManager.Loader
         } else {
 
             mTvEmptyView.setVisibility(View.GONE);
-        }
+        }*/
     }
 }

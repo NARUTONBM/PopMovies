@@ -1,9 +1,13 @@
 package com.naruto.popmovies.fragment;
 
 import android.app.AlertDialog;
+import android.os.Bundle;
+import android.support.annotation.Nullable;
 import android.support.v4.app.Fragment;
 import android.view.Window;
 
+import com.blankj.utilcode.util.AppUtils;
+import com.blankj.utilcode.util.SPUtils;
 import com.naruto.popmovies.R;
 
 /**
@@ -16,8 +20,15 @@ import com.naruto.popmovies.R;
 public class BaseFragment extends Fragment {
 
     protected AlertDialog mDialog;
+    protected SPUtils mSPUtils;
 
-    protected void showAlertDialog() {
+    @Override
+    public void onCreate(@Nullable Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        mSPUtils = SPUtils.getInstance(AppUtils.getAppName());
+    }
+
+    public void showDialog() {
         if (mDialog == null) {
             mDialog = new AlertDialog.Builder(getContext()).create();
         }
@@ -29,7 +40,7 @@ public class BaseFragment extends Fragment {
         }
     }
 
-    protected void dismissDialog() {
+    public void dismissDialog() {
         mDialog.dismiss();
     }
 }

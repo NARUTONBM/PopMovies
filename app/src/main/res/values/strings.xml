@@ -68,6 +68,7 @@
     <string name="empty_forecast_list">No Movies Information Available</string>
     <string name="muzei_desc">Top Movie</string>
     <string name="value_name_youtube_id">v=</string>
+    <string name="value_toast_there_is_no_more">没有更多数据了~</string>
     <string-array name="select_frequency">
         <item>1小时</item>
         <item>2小时</item>

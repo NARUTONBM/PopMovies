@@ -21,7 +21,10 @@ import com.bumptech.glide.request.RequestOptions;
 import com.bumptech.glide.request.target.BitmapImageViewTarget;
 import com.bumptech.glide.request.transition.Transition;
 import com.naruto.popmovies.R;
-import com.naruto.popmovies.bean.MovieDetail;
+import com.naruto.popmovies.bean.MovieListBean;
+import com.naruto.popmovies.db.model.Genre;
+
+import org.litepal.LitePal;
 
 import java.util.List;
 
@@ -32,13 +35,13 @@ import java.util.List;
  */
 public class MovieAdapter extends RecyclerView.Adapter<MovieAdapter.ViewHolder> implements View.OnClickListener {
 
-    private List<MovieDetail> mMovieDetailList;
+    private List<MovieListBean.ResultsBean> mMovieList;
     private Context mContext;
     private OnRecyclerViewItemClickListener mOnItemClickListener = null;
     private Cursor mCursor;
 
-    public MovieAdapter(List<MovieDetail> movieDetailList) {
-        mMovieDetailList = movieDetailList;
+    public MovieAdapter(List<MovieListBean.ResultsBean> movieList) {
+        mMovieList = movieList;
     }
 
     @Override
@@ -53,7 +56,7 @@ public class MovieAdapter extends RecyclerView.Adapter<MovieAdapter.ViewHolder> 
     @Override
     public void onBindViewHolder(final ViewHolder holder, int position) {
         // 获取当前条目的数据
-        MovieDetail movieDetail = mMovieDetailList.get(position);
+        MovieListBean.ResultsBean movie = mMovieList.get(position);
         // 加载网络图片并设置给imageView
         RequestOptions options = new RequestOptions()
                 .placeholder(R.mipmap.backdrop_loading)
@@ -63,7 +66,7 @@ public class MovieAdapter extends RecyclerView.Adapter<MovieAdapter.ViewHolder> 
                 .priority(Priority.HIGH);
         Glide.with(mContext)
                 .asBitmap()
-                .load(movieDetail.getBackdropHttpPath())
+                .load(movie.getBackdropPath())
                 .apply(options)
                 .into(new BitmapImageViewTarget(holder.ivMovieBd) {
                     @Override
@@ -74,14 +77,14 @@ public class MovieAdapter extends RecyclerView.Adapter<MovieAdapter.ViewHolder> 
                 });
 
         // 设置标题
-        holder.tvMovieTitle.setText(movieDetail.getTitle());
+        holder.tvMovieTitle.setText(movie.getTitle());
         // 设置类型
-        String genreStrs = movieDetail.getGenreStrs();
-        holder.tvMovieGenre.setText(genreStrs);
+        String genres = getGenres(movie.getGenres());
+        holder.tvMovieGenre.setText(genres);
         // 设置评分数
-        holder.rbMovieStar.setRating(((float) movieDetail.getVoteAverage()) / 2);
+        holder.rbMovieStar.setRating(((float) movie.getVoteAverage()) / 2);
         // 设置上映日期
-        holder.tvMoviesDate.setText(movieDetail.getReleaseDateY());
+        holder.tvMoviesDate.setText(movie.getReleaseDate().split("-")[0]);
         holder.cardView.setTag(position);
     }
 
@@ -89,9 +92,21 @@ public class MovieAdapter extends RecyclerView.Adapter<MovieAdapter.ViewHolder> 
         holder.cardView.setCardBackgroundColor(palette.getVibrantColor(mContext.getResources().getColor(R.color.black_translucent_60)));
     }
 
+    private String getGenres(List<Integer> genreIdList) {
+        StringBuilder genres = new StringBuilder();
+        for (int genreId : genreIdList) {
+            Genre genre = LitePal.where("genre_id = ?", String.valueOf(genreId))
+                    .find(Genre.class)
+                    .get(0);
+            genres.append(genre.getName()).append(" ");
+        }
+
+        return genres.toString();
+    }
+
     @Override
     public int getItemCount() {
-        return mMovieDetailList.size();
+        return mMovieList.size();
     }
 
     @Override
