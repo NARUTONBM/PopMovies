@@ -1,6 +1,7 @@
 package com.naruto.popmovies.https;
 
 import com.blankj.utilcode.util.ToastUtils;
+import com.naruto.popmovies.activity.BaseActivity;
 
 import io.reactivex.Observer;
 import io.reactivex.annotations.NonNull;
@@ -11,13 +12,16 @@ import io.reactivex.disposables.Disposable;
  */
 public abstract class BaseHandleSubscriber<T> implements Observer<T> {
 
-    public BaseHandleSubscriber() {
+    private BaseActivity mActivity;
+
+    public BaseHandleSubscriber(BaseActivity activity) {
+        mActivity = activity;
     }
 
     @Override
     public void onSubscribe(@NonNull Disposable d) {
+        mActivity.showDialog();
     }
-
 
     @Override
     public void onComplete() {
@@ -25,6 +29,7 @@ public abstract class BaseHandleSubscriber<T> implements Observer<T> {
 
     @Override
     public void onError(@NonNull Throwable t) {
+        mActivity.dismissDialog();
         t.printStackTrace();
         ToastUtils.showLong("服务器请求报错：" + t.getMessage());
         //如果你某个地方不想使用全局错误处理,则重写 onError(Throwable) 并将 super.onError(e); 删掉

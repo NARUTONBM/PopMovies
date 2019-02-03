@@ -36,6 +36,7 @@ import com.blankj.utilcode.util.ToastUtils;
 import com.jude.easyrecyclerview.decoration.SpaceDecoration;
 import com.naruto.popmovies.BuildConfig;
 import com.naruto.popmovies.R;
+import com.naruto.popmovies.activity.MainActivity;
 import com.naruto.popmovies.adapter.MovieAdapter;
 import com.naruto.popmovies.bean.MovieDetail;
 import com.naruto.popmovies.bean.MovieListBean;
@@ -46,12 +47,14 @@ import com.naruto.popmovies.https.BaseHandleSubscriber;
 import com.naruto.popmovies.https.RetrofitHelper;
 import com.naruto.popmovies.sync.SyncAdapter;
 import com.naruto.popmovies.util.MovieDbUtils;
-import com.naruto.popmovies.util.RxUtils;
 import com.naruto.popmovies.util.SpUtils;
 import com.naruto.popmovies.util.Utils;
 
 import java.util.ArrayList;
 import java.util.List;
+
+import io.reactivex.android.schedulers.AndroidSchedulers;
+import io.reactivex.schedulers.Schedulers;
 
 import static android.support.v7.widget.RecyclerView.SCROLL_STATE_IDLE;
 
@@ -60,7 +63,8 @@ import static android.support.v7.widget.RecyclerView.SCROLL_STATE_IDLE;
  *
  * @author jellybean
  */
-public class MoviesFragment extends BaseFragment implements LoaderManager.LoaderCallbacks<Cursor>, SharedPreferences.OnSharedPreferenceChangeListener {
+public class MoviesFragment extends BaseFragment implements MovieDbUtils.OnCurdFinished, LoaderManager.LoaderCallbacks<Cursor>,
+        SharedPreferences.OnSharedPreferenceChangeListener {
 
     private static final String SELECTED_KEY = "selected_key";
     public static int mOrderMode = Entry.POPULAR_MOVIE_DIR;
@@ -73,8 +77,18 @@ public class MoviesFragment extends BaseFragment implements LoaderManager.Loader
     private static final int MOVIE_LIST_MAX = 20;
     private ContentResolver mResolver;
     private SharedPreferences mPreferences;
+    private MainActivity mActivity;
+    private int mResultSize;
+    private List<Boolean> mResultList = new ArrayList<>();
+    private static MoviesFragment sFragment;
 
-    public MoviesFragment() {
+    public static MoviesFragment newInstance() {
+
+        Bundle args = new Bundle();
+
+        sFragment = new MoviesFragment();
+        sFragment.setArguments(args);
+        return sFragment;
     }
 
     @Override
@@ -82,13 +96,14 @@ public class MoviesFragment extends BaseFragment implements LoaderManager.Loader
 
         super.onCreate(savedInstanceState);
         setHasOptionsMenu(true);
+        sFragment = (MoviesFragment) getFragmentManager().findFragmentById(R.id.fragment_favorite);
     }
 
     @TargetApi(Build.VERSION_CODES.M)
     @Nullable
     @Override
     public View onCreateView(LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
-
+        mActivity = (MainActivity) getActivity();
         View rootView = inflater.inflate(R.layout.fragment_main, container, false);
 
         // 找到空view
@@ -389,25 +404,30 @@ public class MoviesFragment extends BaseFragment implements LoaderManager.Loader
     private void getMovieList(String listType, int pullAction, int page) {
         RetrofitHelper.getBaseApi()
                 .getMovieList(listType, BuildConfig.MOVIE_DB_KEY, page)
-                .compose(RxUtils.applySchedulers(this))
-                .subscribe(new BaseHandleSubscriber<MovieListBean>() {
+                .subscribeOn(Schedulers.io())
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe(new BaseHandleSubscriber<MovieListBean>(mActivity) {
                     @Override
                     public void onNext(MovieListBean movieListBean) {
-                        for (MovieListBean.ResultsBean movieBean : movieListBean.getResults()) {
+                        List<MovieListBean.ResultsBean> resultList = movieListBean.getResults();
+                        mResultSize = resultList.size();
+                        for (MovieListBean.ResultsBean movieBean : resultList) {
                             RetrofitHelper.getBaseApi()
                                     .getVideoAndReviewList(movieBean.getId(), BuildConfig.MOVIE_DB_KEY)
-                                    .compose(RxUtils.applySchedulers())
-                                    .subscribe(new BaseHandleSubscriber<VIRListBean>() {
+                                    .subscribeOn(Schedulers.io())
+                                    .observeOn(AndroidSchedulers.mainThread())
+                                    .subscribe(new BaseHandleSubscriber<VIRListBean>(mActivity) {
                                         @Override
                                         public void onNext(VIRListBean virListBean) {
-                                            MovieDbUtils.addMovie(movieBean, virListBean);
+                                            MovieDbUtils.addMovie(movieBean, virListBean, sFragment);
                                         }
                                     });
                         }
+
                         if (pullAction == Entry.ACTION_REFRESH) {
                             mMovieList.clear();
                         }
-                        mMovieList.addAll(movieListBean.getResults());
+                        mMovieList.addAll(resultList);
                         mMovieAdapter.notifyDataSetChanged();
                         /*if (pullAction == Entry.ACTION_REFRESH) {
                             mSrlFriendsContainer.finishRefresh();
@@ -416,6 +436,15 @@ public class MoviesFragment extends BaseFragment implements LoaderManager.Loader
                         }*/
                     }
                 });
+    }
+
+    @Override
+    public void onFinished(boolean result) {
+        mResultList.add(result);
+        if (mResultList.size() == mResultSize) {
+            mActivity.dismissDialog();
+            mResultList.clear();
+        }
     }
 
     /**

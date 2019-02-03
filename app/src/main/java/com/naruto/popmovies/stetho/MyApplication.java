@@ -4,6 +4,8 @@ import android.content.Context;
 
 import com.blankj.utilcode.util.Utils;
 import com.facebook.stetho.Stetho;
+import com.orhanobut.logger.AndroidLogAdapter;
+import com.orhanobut.logger.Logger;
 
 import org.litepal.LitePal;
 import org.litepal.LitePalApplication;
@@ -26,6 +28,7 @@ public class MyApplication extends LitePalApplication {
                 .enableWebKitInspector(Stetho.defaultInspectorModulesProvider(mContext)).build());
         Utils.init(mContext);
         LitePal.initialize(mContext);
+        Logger.addLogAdapter(new AndroidLogAdapter());
     }
 
     public static Context getContext() {

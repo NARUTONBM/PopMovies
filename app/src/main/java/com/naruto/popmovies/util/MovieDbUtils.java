@@ -29,7 +29,7 @@ public class MovieDbUtils {
      * @param movie       movie原始数据
      * @param virListBean movie对应的video,image,review数据
      */
-    public static void addMovie(MovieListBean.ResultsBean movie, VIRListBean virListBean) {
+    public static void addMovie(MovieListBean.ResultsBean movie, VIRListBean virListBean, OnCurdFinished onCurdFinished) {
         Movie movieInfo = new Movie();
         int movieId = movie.getId();
         movieInfo.setMovieId(movieId);
@@ -50,6 +50,7 @@ public class MovieDbUtils {
         movieInfo.setGenreList(getGenreList(movie.getGenres(), movieInfo));
         boolean saveOrUpdate = movieInfo.saveOrUpdate("movie_id = ?", String.valueOf(movieId));
         Logger.d("更新movie_id: " + movieId + (saveOrUpdate ? "成功" : "失败"));
+        onCurdFinished.onFinished(saveOrUpdate);
     }
 
     /**
@@ -58,12 +59,12 @@ public class MovieDbUtils {
      * @param movieListBean   movie数组原始数据
      * @param virListBeanList movie数组对应的video,image,review数据
      */
-    public static void addMovieList(MovieListBean movieListBean, List<VIRListBean> virListBeanList) {
+    /*public static void addMovieList(MovieListBean movieListBean, List<VIRListBean> virListBeanList) {
         List<MovieListBean.ResultsBean> resultsBeanList = movieListBean.getResults();
         for (int i = 0; i < resultsBeanList.size(); i++) {
             addMovie(resultsBeanList.get(i), virListBeanList.get(0));
         }
-    }
+    }*/
 
     /**
      * 为movie匹配对应的链接
@@ -144,5 +145,18 @@ public class MovieDbUtils {
         }
 
         return genreList;
+    }
+
+    /**
+     * 数据库操作结果的回调接口
+     */
+    public interface OnCurdFinished {
+
+        /**
+         * 当CURD操作完成时触发该回调方法
+         *
+         * @param result CURD的结果
+         */
+        void onFinished(boolean result);
     }
 }

@@ -7,13 +7,10 @@ package com.naruto.popmovies.activity;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
-import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
 import android.view.Menu;
 import android.view.MenuItem;
 
-import com.blankj.utilcode.util.AppUtils;
-import com.blankj.utilcode.util.SPUtils;
 import com.naruto.popmovies.BuildConfig;
 import com.naruto.popmovies.R;
 import com.naruto.popmovies.bean.GenreListBean;
@@ -24,26 +21,28 @@ import com.naruto.popmovies.fragment.MoviesFragment;
 import com.naruto.popmovies.https.BaseHandleSubscriber;
 import com.naruto.popmovies.https.RetrofitHelper;
 import com.naruto.popmovies.sync.SyncAdapter;
-import com.naruto.popmovies.util.RxUtils;
 
 import org.litepal.LitePal;
 
-public class MainActivity extends AppCompatActivity implements MoviesFragment.CallBack {
+import io.reactivex.android.schedulers.AndroidSchedulers;
+import io.reactivex.schedulers.Schedulers;
+
+public class MainActivity extends BaseActivity implements MoviesFragment.CallBack {
 
     private static final String DETAILS_FRAGMENT_TAG = "DFTAG";
     private boolean mTwoPane = false;
     private int mOrderMode;
-    private SPUtils mSpUtils;
+    private MainActivity mActivity;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
 
         super.onCreate(savedInstanceState);
+        mActivity = this;
         setContentView(R.layout.activity_main);
         Toolbar toolbar = findViewById(R.id.toolbar_movies);
         setSupportActionBar(toolbar);
-        mSpUtils = SPUtils.getInstance(AppUtils.getAppName());
-        mOrderMode = mSpUtils.getInt(Entry.SP_ORDER_MODE, Entry.POPULAR_MOVIE_DIR);
+        mOrderMode = mSPUtils.getInt(Entry.SP_ORDER_MODE, Entry.POPULAR_MOVIE_DIR);
         //初始化影片类型表genre.db
         initGenreDB();
 
@@ -68,13 +67,14 @@ public class MainActivity extends AppCompatActivity implements MoviesFragment.Ca
      * 初始化数据库的方法，首先写入或更新genre.db
      */
     private void initGenreDB() {
-        if (!mSpUtils.getBoolean(Entry.SP_DB_INIT, false)) {
+        if (!mSPUtils.getBoolean(Entry.SP_DB_INIT, false)) {
             LitePal.getDatabase();
         }
         RetrofitHelper.getBaseApi()
                 .getGenreList(BuildConfig.MOVIE_DB_KEY)
-                .compose(RxUtils.applySchedulers())
-                .subscribe(new BaseHandleSubscriber<GenreListBean>() {
+                .subscribeOn(Schedulers.io())
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe(new BaseHandleSubscriber<GenreListBean>(mActivity) {
                     @Override
                     public void onNext(GenreListBean genreList) {
                         boolean finalResult = true;
@@ -85,7 +85,7 @@ public class MainActivity extends AppCompatActivity implements MoviesFragment.Ca
                             boolean suResult = dbGenre.saveOrUpdate("genre_id = ?", String.valueOf(genre.getId()));
                             finalResult = finalResult & suResult;
                         }
-                        mSpUtils.put(Entry.SP_DB_INIT, finalResult);
+                        mSPUtils.put(Entry.SP_DB_INIT, finalResult);
                     }
                 });
     }
@@ -118,7 +118,7 @@ public class MainActivity extends AppCompatActivity implements MoviesFragment.Ca
 
         super.onResume();
         // 当排序模式发生变化时，调用方法刷新数据
-        int orderMode = mSpUtils.getInt(Entry.SP_ORDER_MODE, Entry.POPULAR_MOVIE_DIR);
+        int orderMode = mSPUtils.getInt(Entry.SP_ORDER_MODE, Entry.POPULAR_MOVIE_DIR);
         if (orderMode != mOrderMode) {
 
             MoviesFragment moviesFragment = (MoviesFragment) getSupportFragmentManager().findFragmentById(R.id.fragment_movies);
