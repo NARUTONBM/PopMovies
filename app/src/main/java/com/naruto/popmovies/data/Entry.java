@@ -117,4 +117,8 @@ public class Entry {
      * 列表类型：favorite
      */
     public static final String REQUEST_FAVORITE = "favorite";
+    /**
+     * 一页加载的最大数量
+     */
+    public static final int SINGLE_PAGE_SIZE = 20;
 }

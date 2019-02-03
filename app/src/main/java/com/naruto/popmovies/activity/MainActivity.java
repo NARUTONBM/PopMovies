@@ -20,7 +20,6 @@ import com.naruto.popmovies.fragment.MovieDetailsFragment;
 import com.naruto.popmovies.fragment.MoviesFragment;
 import com.naruto.popmovies.https.BaseHandleSubscriber;
 import com.naruto.popmovies.https.RetrofitHelper;
-import com.naruto.popmovies.sync.SyncAdapter;
 
 import org.litepal.LitePal;
 
@@ -59,8 +58,6 @@ public class MainActivity extends BaseActivity implements MoviesFragment.CallBac
 
             mTwoPane = false;
         }
-
-        SyncAdapter.initializeSyncAdapter(this);
     }
 
     /**
@@ -69,25 +66,25 @@ public class MainActivity extends BaseActivity implements MoviesFragment.CallBac
     private void initGenreDB() {
         if (!mSPUtils.getBoolean(Entry.SP_DB_INIT, false)) {
             LitePal.getDatabase();
-        }
-        RetrofitHelper.getBaseApi()
-                .getGenreList(BuildConfig.MOVIE_DB_KEY)
-                .subscribeOn(Schedulers.io())
-                .observeOn(AndroidSchedulers.mainThread())
-                .subscribe(new BaseHandleSubscriber<GenreListBean>(mActivity) {
-                    @Override
-                    public void onNext(GenreListBean genreList) {
-                        boolean finalResult = true;
-                        for (Genre genre : genreList.getGenres()) {
-                            Genre dbGenre = new Genre();
-                            dbGenre.setGenreId(genre.getId());
-                            dbGenre.setName(genre.getName());
-                            boolean suResult = dbGenre.saveOrUpdate("genre_id = ?", String.valueOf(genre.getId()));
-                            finalResult = finalResult & suResult;
+            RetrofitHelper.getBaseApi()
+                    .getGenreList(BuildConfig.MOVIE_DB_KEY)
+                    .subscribeOn(Schedulers.io())
+                    .observeOn(AndroidSchedulers.mainThread())
+                    .subscribe(new BaseHandleSubscriber<GenreListBean>(mActivity) {
+                        @Override
+                        public void onNext(GenreListBean genreList) {
+                            boolean finalResult = true;
+                            for (Genre genre : genreList.getGenres()) {
+                                Genre dbGenre = new Genre();
+                                dbGenre.setGenreId(genre.getId());
+                                dbGenre.setName(genre.getName());
+                                boolean suResult = dbGenre.saveOrUpdate("genre_id = ?", String.valueOf(genre.getId()));
+                                finalResult = finalResult & suResult;
+                            }
+                            mSPUtils.put(Entry.SP_DB_INIT, finalResult);
                         }
-                        mSPUtils.put(Entry.SP_DB_INIT, finalResult);
-                    }
-                });
+                    });
+        }
     }
 
     @Override

@@ -27,6 +27,7 @@ public class Movie extends LitePalSupport {
     private boolean adult;
     private String overview;
     private String release_date;
+    private int type;
     private List<Links> mLinkList;
     private List<Genre> mGenreList;
     private List<Review> mReviewList;
@@ -141,6 +142,14 @@ public class Movie extends LitePalSupport {
 
     public void setReleaseDate(String releaseDate) {
         this.release_date = releaseDate;
+    }
+
+    public int getType() {
+        return type;
+    }
+
+    public void setType(int type) {
+        this.type = type;
     }
 
     public List<Links> getLinkList() {

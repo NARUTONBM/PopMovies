@@ -11,7 +11,6 @@ import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
-import android.preference.PreferenceManager;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.support.v4.app.ActivityCompat;
@@ -43,12 +42,16 @@ import com.naruto.popmovies.bean.MovieListBean;
 import com.naruto.popmovies.bean.VIRListBean;
 import com.naruto.popmovies.data.Entry;
 import com.naruto.popmovies.data.MovieDetailsContract;
+import com.naruto.popmovies.db.model.Genre;
+import com.naruto.popmovies.db.model.Movie;
 import com.naruto.popmovies.https.BaseHandleSubscriber;
 import com.naruto.popmovies.https.RetrofitHelper;
 import com.naruto.popmovies.sync.SyncAdapter;
 import com.naruto.popmovies.util.MovieDbUtils;
 import com.naruto.popmovies.util.SpUtils;
 import com.naruto.popmovies.util.Utils;
+
+import org.litepal.LitePal;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -76,11 +79,11 @@ public class MoviesFragment extends BaseFragment implements MovieDbUtils.OnCurdF
     private List<MovieListBean.ResultsBean> mMovieList = new ArrayList<>();
     private static final int MOVIE_LIST_MAX = 20;
     private ContentResolver mResolver;
-    private SharedPreferences mPreferences;
     private MainActivity mActivity;
     private int mResultSize;
     private List<Boolean> mResultList = new ArrayList<>();
     private static MoviesFragment sFragment;
+    private static int sPullAction = Entry.ACTION_REFRESH;
 
     public static MoviesFragment newInstance() {
 
@@ -129,46 +132,28 @@ public class MoviesFragment extends BaseFragment implements MovieDbUtils.OnCurdF
         rvMovie.addOnScrollListener(new RecyclerView.OnScrollListener() {
             @Override
             public void onScrollStateChanged(RecyclerView recyclerView, int newState) {
-
-                // 当前RecyclerView显示出来的第一个和最后一个的item的position
-                // int firstPosition = -1;
+                // 当前RecyclerView显示出来的最后一个的item的position
                 int lastPosition = -1;
 
                 if (newState == SCROLL_STATE_IDLE) {
-
                     RecyclerView.LayoutManager layoutManager = recyclerView.getLayoutManager();
                     if (layoutManager instanceof GridLayoutManager) {
-
-                        // 通过LayoutManager找到当前的第一个item的position
-                        // firstPosition = ((GridLayoutManager)
-                        // layoutManager).findFirstVisibleItemPosition();
+                        // 通过LayoutManager找到当前的最后一个item的position
                         lastPosition = ((GridLayoutManager) layoutManager).findLastVisibleItemPosition();
                     } else if (layoutManager instanceof LinearLayoutManager) {
-
-                        // firstPosition = ((LinearLayoutManager)
-                        // layoutManager).findFirstVisibleItemPosition();
                         lastPosition = ((LinearLayoutManager) layoutManager).findLastVisibleItemPosition();
                     } else if (layoutManager instanceof StaggeredGridLayoutManager) {
-
                         // 因为StaggeredGridLayoutManager的特殊性可能导致最后显示的item存在多个，所以这里取到的是一个数组
                         // 得到这个数组后再取到数组中position值最小的那个就是第一个的position值了
-                        // int[] firstPositions = new int[((StaggeredGridLayoutManager)
-                        // layoutManager).getSpanCount()];
-                        // ((StaggeredGridLayoutManager)
-                        // layoutManager).findFirstVisibleItemPositions(firstPositions);
-                        // firstPosition = findMin(firstPositions);
                         // 得到这个数组后再取到数组中position值最大的那个就是最后显示的position值了
                         int[] lastPositions = new int[((StaggeredGridLayoutManager) layoutManager).getSpanCount()];
                         ((StaggeredGridLayoutManager) layoutManager).findLastVisibleItemPositions(lastPositions);
                         lastPosition = findMax(lastPositions);
                     }
 
-                    // 把当前的第一个item的position设置给mPosition
-                    // mPosition = firstPosition;
                     // 时判断界面显示的最后item的position是否等于itemCount总数-1也就是最后一个item的position
                     // 如果相等则说明已经滑动到最后了
                     if (lastPosition == recyclerView.getLayoutManager().getItemCount() - 1) {
-
                         Toast.makeText(getContext(), R.string.toast_already_scroll_to_the_bottom, Toast.LENGTH_SHORT).show();
                     }
                 }
@@ -176,7 +161,6 @@ public class MoviesFragment extends BaseFragment implements MovieDbUtils.OnCurdF
 
             @Override
             public void onScrolled(RecyclerView recyclerView, int dx, int dy) {
-
                 super.onScrolled(recyclerView, dx, dy);
             }
         });
@@ -184,11 +168,7 @@ public class MoviesFragment extends BaseFragment implements MovieDbUtils.OnCurdF
         // 获取当前的排序模式
         mOrderMode = mSPUtils.getInt(Entry.SP_ORDER_MODE, Entry.POPULAR_MOVIE_DIR);
         //加载数据
-        if (mOrderMode == Entry.POPULAR_MOVIE_DIR) {
-            getMovieList(Entry.REQUEST_POPULAR, Entry.ACTION_REFRESH, 1);
-        } else if (mOrderMode == Entry.TOP_RATE_MOVIE_DIR) {
-            getMovieList(Entry.REQUEST_TOP_RATE, Entry.ACTION_REFRESH, 1);
-        }
+        loadData(Entry.ACTION_REFRESH, 1);
 
         // 设置recyclerView的条目点击事件
         mMovieAdapter.setOnItemClickListener((view, position) -> {
@@ -204,13 +184,151 @@ public class MoviesFragment extends BaseFragment implements MovieDbUtils.OnCurdF
 
         // 检查是否获得权限，没有这需要申请权限，由用户决定是否给予
         if (ContextCompat.checkSelfPermission(getContext(), android.Manifest.permission.ACCESS_NETWORK_STATE) != PackageManager.PERMISSION_GRANTED
-                || ContextCompat.checkSelfPermission(getContext(),
-                Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
+                || ContextCompat.checkSelfPermission(getContext(), Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
             ActivityCompat.requestPermissions(getActivity(),
                     new String[]{Manifest.permission.ACCESS_NETWORK_STATE, Manifest.permission.WRITE_EXTERNAL_STORAGE}, 1);
         }
 
+        getTargetMovieList(mOrderMode, Entry.ACTION_REFRESH, 1);
+
         return rootView;
+    }
+
+    /**
+     * 根据当前列表模式加载相应的数据
+     */
+    private void loadData(int pullAction, int page) {
+        if (mOrderMode == Entry.POPULAR_MOVIE_DIR) {
+            getMovieList(Entry.REQUEST_POPULAR, pullAction, page);
+        } else if (mOrderMode == Entry.TOP_RATE_MOVIE_DIR) {
+            getMovieList(Entry.REQUEST_TOP_RATE, pullAction, page);
+        } else {
+            getTargetMovieList(Entry.FAVORITE_MOVIE_DIR, pullAction, page);
+        }
+    }
+
+    /**
+     * 获取电影列表
+     *
+     * @param listType   列表类型
+     * @param pullAction 滑动动作
+     * @param page       页码
+     */
+    private void getMovieList(String listType, int pullAction, int page) {
+        if (!LitePal.findAll(Genre.class).isEmpty()) {
+            RetrofitHelper.getBaseApi()
+                    .getMovieList(listType, BuildConfig.MOVIE_DB_KEY, page)
+                    .subscribeOn(Schedulers.io())
+                    .observeOn(AndroidSchedulers.mainThread())
+                    .subscribe(new BaseHandleSubscriber<MovieListBean>(mActivity) {
+                        @Override
+                        public void onNext(MovieListBean movieListBean) {
+                            List<MovieListBean.ResultsBean> resultList = movieListBean.getResults();
+                            mResultSize = resultList.size();
+                            for (MovieListBean.ResultsBean movieBean : resultList) {
+                                RetrofitHelper.getBaseApi()
+                                        .getVideoAndReviewList(movieBean.getId(), BuildConfig.MOVIE_DB_KEY)
+                                        .subscribeOn(Schedulers.io())
+                                        .observeOn(AndroidSchedulers.mainThread())
+                                        .subscribe(new BaseHandleSubscriber<VIRListBean>(mActivity) {
+                                            @Override
+                                            public void onNext(VIRListBean virListBean) {
+                                                MovieDbUtils.addMovie(mOrderMode, movieBean, virListBean, sFragment);
+                                            }
+                                        });
+                            }
+
+                            if (pullAction == Entry.ACTION_REFRESH) {
+                                mMovieList.clear();
+                            }
+                            mMovieList.addAll(resultList);
+                            mMovieAdapter.notifyDataSetChanged();
+                        /*if (pullAction == Entry.ACTION_REFRESH) {
+                            mSrlFriendsContainer.finishRefresh();
+                        } else if (pullAction == Entry.ACTION_LOAD_MORE) {
+                            mSrlFriendsContainer.finishLoadMore();
+                        }*/
+                        }
+                    });
+        } else {
+            getMovieList(listType, pullAction, page);
+        }
+    }
+
+    /**
+     * 获取喜爱的电影列表
+     *
+     * @param pullAction 滑动动作
+     * @param page       页码
+     */
+    private void getTargetMovieList(int orderMode, int pullAction, int page) {
+        // TODO: 2019-02-04 待考虑上滑加载更多的逻辑
+        //找到目标排序类型的所有电影
+        List<Movie> movieList = LitePal.where("type = ?", String.valueOf(orderMode))
+                .find(Movie.class);
+        if (!movieList.isEmpty()) {
+            if (movieList.size() > Entry.SINGLE_PAGE_SIZE) {
+                //多余20个，取前20个
+                List<Movie> subMovieList = movieList.subList(0, Entry.SINGLE_PAGE_SIZE - 1);
+                getMovieList(subMovieList);
+            } else {
+                getMovieList(movieList);
+            }
+        /*if (pullAction == Entry.ACTION_REFRESH) {
+            mSrlFriendsContainer.finishRefresh();
+        } else if (pullAction == Entry.ACTION_LOAD_MORE) {
+            mSrlFriendsContainer.finishLoadMore();
+        }*/
+            mMovieAdapter.notifyDataSetChanged();
+        }
+    }
+
+    /**
+     * 从数据库中获取电影列表转换成MovieListBean.ResultBean类型的列表
+     *
+     * @param movieList 数据库的电影列表
+     */
+    private void getMovieList(List<Movie> movieList) {
+        for (Movie movie : movieList) {
+            MovieListBean.ResultsBean resultsBean = new MovieListBean.ResultsBean();
+            resultsBean.setId(movie.getMovieId());
+            resultsBean.setAdult(movie.isAdult());
+            resultsBean.setBackdropPath(movie.getBackdropPath());
+            resultsBean.setPosterPath(movie.getPosterPath());
+            resultsBean.setOriginalLanguage(movie.getOriginalLanguage());
+            resultsBean.setOriginalTitle(movie.getOriginalTitle());
+            resultsBean.setOverview(movie.getOverview());
+            resultsBean.setPopularity(movie.getPopularity());
+            resultsBean.setReleaseDate(movie.getReleaseDate());
+            resultsBean.setTitle(movie.getTitle());
+            resultsBean.setVoteAverage(movie.getVoteAverage());
+            resultsBean.setVoteCount(movie.getVoteCount());
+            resultsBean.setGenreIds(getGenreIdList(movie.getGenreList()));
+            mMovieList.add(resultsBean);
+        }
+    }
+
+    /**
+     * 根据类型列表获取类型id列表
+     *
+     * @param genreList 类型列表
+     * @return 类型id列表
+     */
+    private List<Integer> getGenreIdList(List<Genre> genreList) {
+        List<Integer> genreIdList = new ArrayList<>();
+        for (Genre genre : genreList) {
+            genreIdList.add(genre.getGenreId());
+        }
+        return genreIdList;
+    }
+
+    @Override
+    public void onFinished(boolean result) {
+        mResultList.add(result);
+        if (mResultList.size() == mResultSize) {
+            mActivity.dismissDialog();
+            mResultList.clear();
+        }
     }
 
     @Override
@@ -223,20 +341,10 @@ public class MoviesFragment extends BaseFragment implements MovieDbUtils.OnCurdF
         // 根据当前用户选择的排序模式，启动相应的loader去加载数据
         getLoaderManager().initLoader(fetchCurrentLoaderId(), null, this);
         if (mOrderMode != Entry.FAVORITE_MOVIE_DIR) {
-
             showDialog();
         }
         updateEmptyView();
         super.onActivityCreated(savedInstanceState);
-    }
-
-    @Override
-    public void onResume() {
-
-        mPreferences = PreferenceManager.getDefaultSharedPreferences(getActivity());
-        mPreferences.registerOnSharedPreferenceChangeListener(this);
-
-        super.onResume();
     }
 
     /**
@@ -246,12 +354,9 @@ public class MoviesFragment extends BaseFragment implements MovieDbUtils.OnCurdF
      * @return 返回第一个那个控件的位置index
      */
     private int findMin(int[] firstPositions) {
-
         int min = firstPositions[0];
         for (int value : firstPositions) {
-
             if (value < min) {
-
                 min = value;
             }
         }
@@ -266,12 +371,9 @@ public class MoviesFragment extends BaseFragment implements MovieDbUtils.OnCurdF
      * @return 返回最后那个控件的位置index
      */
     private int findMax(int[] lastPositions) {
-
         int max = lastPositions[0];
         for (int value : lastPositions) {
-
             if (value > max) {
-
                 max = value;
             }
         }
@@ -284,9 +386,9 @@ public class MoviesFragment extends BaseFragment implements MovieDbUtils.OnCurdF
      */
     public void onOrderModeChanged() {
 
-        updateMovies();
-        // 根据当前用户选择的排序模式，启动相应的loader去加载数据
-        getLoaderManager().restartLoader(fetchCurrentLoaderId(), null, this);
+        mMovieDetails.clear();
+        mMovieAdapter.notifyDataSetChanged();
+        loadData(sPullAction, 1);
     }
 
     /**
@@ -308,36 +410,13 @@ public class MoviesFragment extends BaseFragment implements MovieDbUtils.OnCurdF
         }
     }
 
-    /**
-     * 启动SyncAdapter，后台刷新数据
-     */
-    private void updateMovies() {
-
-        mMovieDetails.clear();
-        //mMovieAdapter.notifyDataSetChanged();
-        showDialog();
-        if (mOrderMode != Entry.FAVORITE_MOVIE_DIR) {
-
-            SyncAdapter.syncImmediately(getActivity());
-        }
-    }
-
     @Override
     public void onSaveInstanceState(Bundle outState) {
-
         if (mPosition != RecyclerView.INVALID_TYPE) {
-
             outState.putInt(SELECTED_KEY, mPosition);
         }
 
         super.onSaveInstanceState(outState);
-    }
-
-    @Override
-    public void onPause() {
-
-        mPreferences.unregisterOnSharedPreferenceChangeListener(this);
-        super.onPause();
     }
 
     @Override
@@ -391,59 +470,6 @@ public class MoviesFragment extends BaseFragment implements MovieDbUtils.OnCurdF
 
             default:
                 break;
-        }
-    }
-
-    /**
-     * 获取电影列表
-     *
-     * @param listType   列表类型
-     * @param pullAction 滑动动作
-     * @param page       页码
-     */
-    private void getMovieList(String listType, int pullAction, int page) {
-        RetrofitHelper.getBaseApi()
-                .getMovieList(listType, BuildConfig.MOVIE_DB_KEY, page)
-                .subscribeOn(Schedulers.io())
-                .observeOn(AndroidSchedulers.mainThread())
-                .subscribe(new BaseHandleSubscriber<MovieListBean>(mActivity) {
-                    @Override
-                    public void onNext(MovieListBean movieListBean) {
-                        List<MovieListBean.ResultsBean> resultList = movieListBean.getResults();
-                        mResultSize = resultList.size();
-                        for (MovieListBean.ResultsBean movieBean : resultList) {
-                            RetrofitHelper.getBaseApi()
-                                    .getVideoAndReviewList(movieBean.getId(), BuildConfig.MOVIE_DB_KEY)
-                                    .subscribeOn(Schedulers.io())
-                                    .observeOn(AndroidSchedulers.mainThread())
-                                    .subscribe(new BaseHandleSubscriber<VIRListBean>(mActivity) {
-                                        @Override
-                                        public void onNext(VIRListBean virListBean) {
-                                            MovieDbUtils.addMovie(movieBean, virListBean, sFragment);
-                                        }
-                                    });
-                        }
-
-                        if (pullAction == Entry.ACTION_REFRESH) {
-                            mMovieList.clear();
-                        }
-                        mMovieList.addAll(resultList);
-                        mMovieAdapter.notifyDataSetChanged();
-                        /*if (pullAction == Entry.ACTION_REFRESH) {
-                            mSrlFriendsContainer.finishRefresh();
-                        } else if (pullAction == Entry.ACTION_LOAD_MORE) {
-                            mSrlFriendsContainer.finishLoadMore();
-                        }*/
-                    }
-                });
-    }
-
-    @Override
-    public void onFinished(boolean result) {
-        mResultList.add(result);
-        if (mResultList.size() == mResultSize) {
-            mActivity.dismissDialog();
-            mResultList.clear();
         }
     }
 

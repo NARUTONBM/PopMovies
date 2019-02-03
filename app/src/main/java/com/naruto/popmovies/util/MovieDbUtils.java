@@ -29,7 +29,7 @@ public class MovieDbUtils {
      * @param movie       movie原始数据
      * @param virListBean movie对应的video,image,review数据
      */
-    public static void addMovie(MovieListBean.ResultsBean movie, VIRListBean virListBean, OnCurdFinished onCurdFinished) {
+    public static void addMovie(int type, MovieListBean.ResultsBean movie, VIRListBean virListBean, OnCurdFinished onCurdFinished) {
         Movie movieInfo = new Movie();
         int movieId = movie.getId();
         movieInfo.setMovieId(movieId);
@@ -44,6 +44,7 @@ public class MovieDbUtils {
         movieInfo.setTitle(movie.getTitle());
         movieInfo.setVoteAverage(movie.getVoteAverage());
         movieInfo.setVoteCount(movie.getVoteCount());
+        movieInfo.setType(type);
         movieInfo.setLinkList(addLinks(virListBean));
         movieInfo.setReviewList(addReview(virListBean));
         movieInfo.saveOrUpdate("movie_id = ?", String.valueOf(movieId));
