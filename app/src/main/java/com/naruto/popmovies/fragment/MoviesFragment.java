@@ -35,7 +35,6 @@ import com.blankj.utilcode.util.ToastUtils;
 import com.jude.easyrecyclerview.decoration.SpaceDecoration;
 import com.naruto.popmovies.BuildConfig;
 import com.naruto.popmovies.R;
-import com.naruto.popmovies.activity.MainActivity;
 import com.naruto.popmovies.adapter.MovieAdapter;
 import com.naruto.popmovies.bean.MovieDetail;
 import com.naruto.popmovies.bean.MovieListBean;
@@ -46,7 +45,6 @@ import com.naruto.popmovies.db.model.Genre;
 import com.naruto.popmovies.db.model.Movie;
 import com.naruto.popmovies.https.BaseHandleSubscriber;
 import com.naruto.popmovies.https.RetrofitHelper;
-import com.naruto.popmovies.sync.SyncAdapter;
 import com.naruto.popmovies.util.MovieDbUtils;
 import com.naruto.popmovies.util.SpUtils;
 import com.naruto.popmovies.util.Utils;
@@ -79,11 +77,11 @@ public class MoviesFragment extends BaseFragment implements MovieDbUtils.OnCurdF
     private List<MovieListBean.ResultsBean> mMovieList = new ArrayList<>();
     private static final int MOVIE_LIST_MAX = 20;
     private ContentResolver mResolver;
-    private MainActivity mActivity;
     private int mResultSize;
     private List<Boolean> mResultList = new ArrayList<>();
     private static MoviesFragment sFragment;
     private static int sPullAction = Entry.ACTION_REFRESH;
+    private List<Boolean> mInitGenreDBResultList = new ArrayList<>();
 
     public static MoviesFragment newInstance() {
 
@@ -106,8 +104,14 @@ public class MoviesFragment extends BaseFragment implements MovieDbUtils.OnCurdF
     @Nullable
     @Override
     public View onCreateView(LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
-        mActivity = (MainActivity) getActivity();
         View rootView = inflater.inflate(R.layout.fragment_main, container, false);
+
+        // 检查是否获得权限，没有这需要申请权限，由用户决定是否给予
+        if (ContextCompat.checkSelfPermission(getContext(), android.Manifest.permission.ACCESS_NETWORK_STATE) != PackageManager.PERMISSION_GRANTED
+                || ContextCompat.checkSelfPermission(getContext(), Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(getActivity(),
+                    new String[]{Manifest.permission.ACCESS_NETWORK_STATE, Manifest.permission.WRITE_EXTERNAL_STORAGE}, 1);
+        }
 
         // 找到空view
         mTvEmptyView = rootView.findViewById(R.id.tv_empty_view);
@@ -167,8 +171,6 @@ public class MoviesFragment extends BaseFragment implements MovieDbUtils.OnCurdF
 
         // 获取当前的排序模式
         mOrderMode = mSPUtils.getInt(Entry.SP_ORDER_MODE, Entry.POPULAR_MOVIE_DIR);
-        //加载数据
-        loadData(Entry.ACTION_REFRESH, 1);
 
         // 设置recyclerView的条目点击事件
         mMovieAdapter.setOnItemClickListener((view, position) -> {
@@ -182,16 +184,24 @@ public class MoviesFragment extends BaseFragment implements MovieDbUtils.OnCurdF
             mPosition = savedInstanceState.getInt(SELECTED_KEY);
         }
 
-        // 检查是否获得权限，没有这需要申请权限，由用户决定是否给予
-        if (ContextCompat.checkSelfPermission(getContext(), android.Manifest.permission.ACCESS_NETWORK_STATE) != PackageManager.PERMISSION_GRANTED
-                || ContextCompat.checkSelfPermission(getContext(), Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
-            ActivityCompat.requestPermissions(getActivity(),
-                    new String[]{Manifest.permission.ACCESS_NETWORK_STATE, Manifest.permission.WRITE_EXTERNAL_STORAGE}, 1);
-        }
-
-        getTargetMovieList(mOrderMode, Entry.ACTION_REFRESH, 1);
-
         return rootView;
+    }
+
+    @Override
+    public void onActivityCreated(@Nullable Bundle savedInstanceState) {
+        super.onActivityCreated(savedInstanceState);
+        //初始化影片类型表genre.db
+        initGenreDB();
+    }
+
+    /**
+     * 初始化数据库的方法，首先写入或更新genre.db
+     */
+    private void initGenreDB() {
+        if (!mSPUtils.getBoolean(Entry.SP_DB_INIT, false)) {
+            LitePal.getDatabase();
+            MovieDbUtils.initGenreDB(sFragment);
+        }
     }
 
     /**
@@ -220,7 +230,7 @@ public class MoviesFragment extends BaseFragment implements MovieDbUtils.OnCurdF
                     .getMovieList(listType, BuildConfig.MOVIE_DB_KEY, page)
                     .subscribeOn(Schedulers.io())
                     .observeOn(AndroidSchedulers.mainThread())
-                    .subscribe(new BaseHandleSubscriber<MovieListBean>(mActivity) {
+                    .subscribe(new BaseHandleSubscriber<MovieListBean>(sFragment) {
                         @Override
                         public void onNext(MovieListBean movieListBean) {
                             List<MovieListBean.ResultsBean> resultList = movieListBean.getResults();
@@ -230,7 +240,7 @@ public class MoviesFragment extends BaseFragment implements MovieDbUtils.OnCurdF
                                         .getVideoAndReviewList(movieBean.getId(), BuildConfig.MOVIE_DB_KEY)
                                         .subscribeOn(Schedulers.io())
                                         .observeOn(AndroidSchedulers.mainThread())
-                                        .subscribe(new BaseHandleSubscriber<VIRListBean>(mActivity) {
+                                        .subscribe(new BaseHandleSubscriber<VIRListBean>(sFragment) {
                                             @Override
                                             public void onNext(VIRListBean virListBean) {
                                                 MovieDbUtils.addMovie(mOrderMode, movieBean, virListBean, sFragment);
@@ -326,25 +336,28 @@ public class MoviesFragment extends BaseFragment implements MovieDbUtils.OnCurdF
     public void onFinished(boolean result) {
         mResultList.add(result);
         if (mResultList.size() == mResultSize) {
-            mActivity.dismissDialog();
+            dismissDialog();
             mResultList.clear();
         }
     }
 
     @Override
-    public void onActivityCreated(@Nullable Bundle savedInstanceState) {
-
-        // 注册内容观察者
-        mResolver = getContext().getContentResolver();
-        mResolver.registerContentObserver(MovieDetailsContract.BASE_CONTENT_URI, true, new MoviesObserver(new Handler()));
-        SyncAdapter.syncImmediately(getActivity());
-        // 根据当前用户选择的排序模式，启动相应的loader去加载数据
-        getLoaderManager().initLoader(fetchCurrentLoaderId(), null, this);
-        if (mOrderMode != Entry.FAVORITE_MOVIE_DIR) {
-            showDialog();
+    public void onInitGenreDbFinished(boolean result, int genreSize) {
+        boolean finalResult = true;
+        finalResult = finalResult & result;
+        mInitGenreDBResultList.add(result);
+        if (mInitGenreDBResultList.size() == genreSize) {
+            mSPUtils.put(Entry.SP_DB_INIT, finalResult);
+            mInitGenreDBResultList.clear();
+            if (!finalResult) {
+                MovieDbUtils.initGenreDB(sFragment);
+            } else {
+                //加载数据库中的本地数据
+                getTargetMovieList(mOrderMode, Entry.ACTION_REFRESH, 1);
+                //加载数据
+                loadData(Entry.ACTION_REFRESH, 1);
+            }
         }
-        updateEmptyView();
-        super.onActivityCreated(savedInstanceState);
     }
 
     /**

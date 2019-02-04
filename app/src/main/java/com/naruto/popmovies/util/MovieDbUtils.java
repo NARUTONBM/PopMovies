@@ -1,5 +1,7 @@
 package com.naruto.popmovies.util;
 
+import com.naruto.popmovies.BuildConfig;
+import com.naruto.popmovies.bean.GenreListBean;
 import com.naruto.popmovies.bean.MovieListBean;
 import com.naruto.popmovies.bean.VIRListBean;
 import com.naruto.popmovies.data.Entry;
@@ -7,12 +9,18 @@ import com.naruto.popmovies.db.model.Genre;
 import com.naruto.popmovies.db.model.Links;
 import com.naruto.popmovies.db.model.Movie;
 import com.naruto.popmovies.db.model.Review;
+import com.naruto.popmovies.fragment.MoviesFragment;
+import com.naruto.popmovies.https.BaseHandleSubscriber;
+import com.naruto.popmovies.https.RetrofitHelper;
 import com.orhanobut.logger.Logger;
 
 import org.litepal.LitePal;
 
 import java.util.ArrayList;
 import java.util.List;
+
+import io.reactivex.android.schedulers.AndroidSchedulers;
+import io.reactivex.schedulers.Schedulers;
 
 /**
  * movies_info.db数据库的增删查工具类
@@ -54,18 +62,31 @@ public class MovieDbUtils {
         onCurdFinished.onFinished(saveOrUpdate);
     }
 
-    /**
-     * 添加多条movie数据
-     *
-     * @param movieListBean   movie数组原始数据
-     * @param virListBeanList movie数组对应的video,image,review数据
-     */
     /*public static void addMovieList(MovieListBean movieListBean, List<VIRListBean> virListBeanList) {
         List<MovieListBean.ResultsBean> resultsBeanList = movieListBean.getResults();
         for (int i = 0; i < resultsBeanList.size(); i++) {
             addMovie(resultsBeanList.get(i), virListBeanList.get(0));
         }
     }*/
+
+    public static void initGenreDB(MoviesFragment fragment) {
+        RetrofitHelper.getBaseApi()
+                .getGenreList(BuildConfig.MOVIE_DB_KEY)
+                .subscribeOn(Schedulers.io())
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe(new BaseHandleSubscriber<GenreListBean>(fragment) {
+                    @Override
+                    public void onNext(GenreListBean genreList) {
+                        for (Genre genre : genreList.getGenres()) {
+                            Genre dbGenre = new Genre();
+                            dbGenre.setGenreId(genre.getId());
+                            dbGenre.setName(genre.getName());
+                            boolean suResult = dbGenre.saveOrUpdate("genre_id = ?", String.valueOf(genre.getId()));
+                            fragment.onInitGenreDbFinished(suResult, genreList.getGenres().size());
+                        }
+                    }
+                });
+    }
 
     /**
      * 为movie匹配对应的链接
@@ -159,5 +180,13 @@ public class MovieDbUtils {
          * @param result CURD的结果
          */
         void onFinished(boolean result);
+
+        /**
+         * 当genre.db写入完成时触发该回调方法
+         *
+         * @param result    单条genre写入结果
+         * @param genreSize genreList的数量
+         */
+        void onInitGenreDbFinished(boolean result, int genreSize);
     }
 }
